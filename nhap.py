@@ -53,18 +53,32 @@ class Stitcher:
         for cnt in contours:
             x, y = cnt[0], cnt[1]
             if x > 0 and x < thresh.shape[1]-1 and y > 0 and y < thresh.shape[0]-1: # contours inside image
-                cv2.imwrite(f"data/output_before_{i}.png", img)
-                img = cv2.circle(img, (x,y), 3, (0,255,0), 2)
-                if np.array_equiv(thresh[y-1, x], [0,0,0]) and not np.array_equiv(thresh[y+1, x], [0,0,0]):
-                    img[:y, x] = img[y+1, x]
-                elif np.array_equiv(thresh[y, x+1], [0,0,0]) and not np.array_equiv(thresh[y, x-1], [0,0,0]):
-                    img[y, x:] = img[y, x-1]
-                elif np.array_equiv(thresh[y+1, x], [0,0,0]) and not np.array_equiv(thresh[y-1, x], [0,0,0]):
+                distance = {'left': x, 
+                            'right': (thresh.shape[1] - 1 - x), 
+                            'top': y, 
+                            'bottom': (thresh.shape[0] - 1 - y)}
+                min_index = np.argmin([distance[dist] for dist in distance])
+                mode = list(distance.keys())[min_index]
+                #cv2.imwrite(f"data/output_before_{i}.png", img)
+                # img = cv2.circle(img, (x,y), 3, (0,255,0), 2)
+                # if np.array_equiv(thresh[y-1, x], [0,0,0]) and not np.array_equiv(thresh[y+1, x], [0,0,0]):
+                #     img[:y, x] = img[y+1, x]
+                # elif np.array_equiv(thresh[y, x+1], [0,0,0]) and not np.array_equiv(thresh[y, x-1], [0,0,0]):
+                #     img[y, x:] = img[y, x-1]
+                # elif np.array_equiv(thresh[y+1, x], [0,0,0]) and not np.array_equiv(thresh[y-1, x], [0,0,0]):
                     
+                #     img[y:, x] = img[y-1, x]
+                # elif np.array_equiv(thresh[y, x-1], [0,0,0]) and not np.array_equiv(thresh[y, x+1], [0,0,0]):
+                #     img[y, :x] = img[y, x+1]
+                if mode == 'top':
+                    img[:y, x] = img[y+1, x]
+                elif mode == 'right':
+                    img[y, x:] = img[y, x-1]
+                elif mode == 'bottom':                    
                     img[y:, x] = img[y-1, x]
-                elif np.array_equiv(thresh[y, x-1], [0,0,0]) and not np.array_equiv(thresh[y, x+1], [0,0,0]):
+                elif mode == 'left':
                     img[y, :x] = img[y, x+1]
-                cv2.imwrite(f"data/output_after_{i}.png", img)
+                #cv2.imwrite(f"data/output_after_{i}.png", img)
                 i += 1
                 
         return img
@@ -88,7 +102,7 @@ class Stitcher:
             pass
         
         # Filter out the black region
-        
+        cv2.imwrite(f"data/output_before_{i}.png", img)
         img = self.remove_black_region(img)
         cv2.imwrite(f"data/output_after_{i}.png", img)
         return img
@@ -110,6 +124,5 @@ stitcher = Stitcher()
 for i in range(1, len(images)):
     img_warped = images[i]
     img_kept = stitcher.stitch([img_kept, img_warped], showMatches = False) 
-    break
     
 print('Done')
