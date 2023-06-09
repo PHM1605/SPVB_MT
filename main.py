@@ -77,3 +77,5 @@ result[0:queryImg.shape[0], 0:queryImg.shape[1]] = queryImg
 _x = np.nonzero(result.sum(0).sum(-1) == 0)[0][0]
 _y = np.nonzero(result.sum(1).sum(-1) == 0)[0][0]
 show(result[:_y,:_x])
+
+#https://datahacker.rs/feature-matching-methods-comparison-in-opencv/
