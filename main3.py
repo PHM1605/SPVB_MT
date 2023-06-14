@@ -1,4 +1,4 @@
-import argparse, cv2, imutils,os
+import argparse, cv2, imutils,os, random
 from imutils import paths
 from blur_detection import blur_detection
 from find_four_corners import find_four_corners
@@ -7,6 +7,16 @@ import numpy as np
 
 def sort_imgs_str(img_names):
     return sorted(img_names, key=lambda x: int(x.split('.')[0].split('_')[-1]))
+
+def draw_matches(imgA, pntsA, imgB, pntsB, color=(255,0,0), export=False):
+    for i in range(pntsA.shape[0]):
+        color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+        imgAA = cv2.circle(imgA, tuple(pntsA[i]), 10, color, -1)
+        imgBB = cv2.circle(imgB, tuple(pntsB[i]), 10, color, -1)
+    if export:
+        cv2.imwrite('data/output/aa.jpg', imgAA)
+        cv2.imwrite('data/output/bb.jpg', imgBB)
+    return imgAA, imgBB
 
 def stitch(images):
     try:
@@ -18,26 +28,26 @@ def stitch(images):
         descriptor = cv2.ORB_create()
         kpsA, featuresA = descriptor.detectAndCompute(trainImg_gray, None)
         kpsB, featuresB = descriptor.detectAndCompute(queryImg_gray, None)
-        # img_kpsA = cv2.drawKeypoints(trainImg_gray, kpsA, None, color=(0,255,0))
-        # img_kpsB = cv2.drawKeypoints(queryImg_gray, kpsB, None, color=(0,255,0))
-        # subplots([img_kpsB, img_kpsA], nc=2, figsize=(10,5), titles=['Query image with keypoints', 'Training image with keypoints'])
+        #img_kpsA = cv2.drawKeypoints(trainImg_gray, kpsA, None, color=(0,255,0))
+        #img_kpsB = cv2.drawKeypoints(queryImg_gray, kpsB, None, color=(0,255,0))
+        #subplots([img_kpsB, img_kpsA], nc=2, figsize=(10,5), titles=['Query image with keypoints', 'Training image with keypoints'])
         bf = cv2.BFMatcher(cv2.NORM_HAMMING)
     
         best_matches = bf.knnMatch (featuresA,featuresB,k=2)
         good_matches = []
         for m1, m2 in best_matches:
-            if m1.distance < 0.4*m2.distance:
+            if m1.distance < 0.6*m2.distance:
                 good_matches.append(m1)
         matches = sorted(good_matches, key=lambda x : x.distance)
-        print(len(matches))
+        #print(len(matches))
         img3 = cv2.drawMatches(trainImg, kpsA, queryImg, kpsB, matches, None, flags = cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
         cv2.imwrite('data/output/draw_match.jpg', img3)
         kpsA = np.float32([kp.pt for kp in kpsA])
         kpsB = np.float32([kp.pt for kp in kpsB])
-        # ptsA = np.float32([kpsA[m.queryIdx] for m in matches])
-        # ptsB = np.float32([kpsB[m.trainIdx] for m in matches])
-        import hickle
-        [ptsA, ptsB] = hickle.load('abc.hkl')
+        ptsA = np.float32([kpsA[m.queryIdx] for m in matches])
+        ptsB = np.float32([kpsB[m.trainIdx] for m in matches])
+       # img1, img2 = draw_matches(queryImg, ptsA, trainImg, ptsB, export=True)
+       
         (H, status) = cv2.findHomography(ptsA, ptsB, cv2.RANSAC,4)
     
         width = trainImg.shape[1] + queryImg.shape[1]
@@ -74,9 +84,9 @@ num_images = 2
 for i in range(0, len(images)-num_images, num_images):
     if i != 2:
         continue
-    frame1_name = os.path.split(imagePaths[i+2])[-1]
+    frame1_name = os.path.split(imagePaths[i])[-1]
     frame1_name = frame1_name.split('.')[0]
-    frame2_name = os.path.split(imagePaths[i])[-1]
+    frame2_name = os.path.split(imagePaths[i+2])[-1]
     frame2_name = frame2_name.split('.')[0]
     subset = images[i:i+num_images]
     stitched = stitch(subset)
