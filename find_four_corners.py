@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from utils import find_threshold_img
 
 def keep_corners(points, img):    
     distance = {}
@@ -24,18 +25,28 @@ def keep_corners(points, img):
          [bottom_right['x'], bottom_right['y']],
          [bottom_left['x'], bottom_left['y']]] )
 
-def find_four_corners(img):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    gray = np.float32(gray)
-    _, thres = cv2.threshold(gray, 1, 255,0)
-    thres = cv2.medianBlur(thres, 5)
-    dst = cv2.cornerHarris(thres,5,3,0.04)
-    ret, dst = cv2.threshold(dst,0.2*dst.max(),255,0)
-    dst = np.uint8(dst)
-    ret, labels, stats, centroids = cv2.connectedComponentsWithStats(dst)
-    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.001)
-    corners = cv2.cornerSubPix(gray,np.float32(centroids),(5,5),(-1,-1),criteria)
-    corners = keep_corners(corners, img)
+# def find_four_corners(img):
+#     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+#     thres = find_threshold_img(img)
+#     gray = np.float32(gray)
+#     contours, _ = cv2.findContours(thres, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+#     contours = contours[0].squeeze(1)
+#     thres = cv2.medianBlur(thres, 5)
+#     dst = cv2.cornerHarris(thres,5,3,0.04)
+#     ret, dst = cv2.threshold(dst,0.2*dst.max(),255,0)
+#     dst = np.uint8(dst)
+#     ret, labels, stats, centroids = cv2.connectedComponentsWithStats(dst)
+#     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.001)
+#     corners = cv2.cornerSubPix(gray,np.float32(centroids),(5,5),(-1,-1),criteria)
+#     corners = corners.astype(int)
+#     corners = [c for c in corners if c in contours]
+#     assert len(corners) >= 4, 'Not enough corners'
+#     corners = keep_corners(corners, img)
+#     return corners
+
+def find_four_corners(contours, img):
+    assert len(contours) >= 4, 'Not enough corners'
+    corners = keep_corners(contours, img)
     return corners
 
 if __name__ == '__main__':
