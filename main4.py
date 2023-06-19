@@ -4,6 +4,7 @@ from utils import get_four_corners
 from perspective_transform import perspective_transform
 from utils import find_threshold_img
 import numpy as np
+import matplotlib.pyplot as plt
 
 def sort_imgs_str(img_names):
     return sorted(img_names, key=lambda x: int(x.split('.')[0].rsplit('frame')[-1]))
@@ -165,7 +166,7 @@ def stitch_by_H(img1, img2, H):
 
     # Warp the perspective of img1
     img_output = cv2.warpPerspective(img1, transform_array.dot(H),
-                                     (x_max - x_min, y_max - y_min))
+                                     (x_max - x_min, y_max - y_min), flags=cv2.INTER_NEAREST)
 
     for i in range(-y_min, h2 - y_min):
         for j in range(-x_min, w2 - x_min):
@@ -175,7 +176,7 @@ def stitch_by_H(img1, img2, H):
 
 img_list = glob.glob('data/images/*.jpg')
 img_list = sort_imgs_str(img_list)
-batch = 30
+batch = 100
 batch_list = []
 prev = cv2.imread(img_list[0])
 for i in range(1, len(img_list), batch):
@@ -183,7 +184,7 @@ for i in range(1, len(img_list), batch):
         prev = cv2.imread(img_list[i-1])
     elif i+batch > len(img_list):
         batch = i+batch-len(img_list)
-    for j in range(batch):
+    for j in range(0, batch, 5):
         curr = cv2.imread(img_list[i+j])
         stitched_img = stitch(prev, curr)
         crop_img = crop_black_2(stitched_img)
@@ -196,14 +197,44 @@ for i in range(1, len(img_list), batch):
     print(f'{int(i/batch)} batch completed')
     batch_list.append(crop_img)
     prev = None
+    break
 
-prev = batch_list[0]
-for i, batch_img in enumerate(batch_list):
-    if i > 0:
-        curr = batch_list[i]
-        final_img = stitch(prev, curr)
-        prev = final_img
-final_img = perspective_transform(final_img, get_four_corners(final_img, mode='left_bottom'))
-final_img = perspective_transform(final_img, get_four_corners(final_img, mode='bottom_left'))
-cv2.imwrite('final.jpg', final_img)
-print('Stitching completed')
+# prev = batch_list[0]
+# curr = batch_list[1]
+# final_img = stitch(prev, curr)
+# for i, batch_img in enumerate(batch_list):
+#     if i > 0:
+#         curr = batch_list[i]
+#         final_img = stitch(prev, curr)
+#         prev = final_img
+# final_img = perspective_transform(final_img, get_four_corners(final_img, mode='left_bottom'))
+# final_img = perspective_transform(final_img, get_four_corners(final_img, mode='bottom_left'))
+# cv2.imwrite('final.jpg', final_img)
+# print('Stitching completed')
+
+# img0 = cv2.imread('data/images/frame32.jpg')
+# img1 = cv2.imread('data/images/frame37.jpg')
+# # img0 = imutils.resize(img0, height=1920)
+# # img1 = imutils.resize(img1, height=1920)
+# test_img = stitch(img0, img1)
+# test_img = perspective_transform(test_img, get_four_corners(test_img, mode='left_bottom'))
+# test_img = perspective_transform(test_img, get_four_corners(test_img, mode='bottom_left'))
+cv2.imwrite('test.png', crop_img)
+# sift = cv2.SIFT_create()
+# h1, w1 = img0.shape[0:2]
+# h2, w2 = img1.shape[0:2]
+# prev_crop = img0[:, w1-w2:]
+# diff = np.size(img0, axis=1) - np.size(prev_crop, axis = 1)
+# kp1, des1 = sift.detectAndCompute(prev_crop, None)
+# kp2, des2 = sift.detectAndCompute(img1, None)
+# bf = cv2.BFMatcher(normType=cv2.NORM_L2)
+# matches = bf.knnMatch(des1, des2, k=2)
+# valid_matches = filter_matches(matches, kp1, kp2)
+        
+# # Extract the coordinates of matching points
+# img1_pts = []
+# img2_pts = []
+# for match in valid_matches:
+#     img1_pts.append(kp1[match.queryIdx].pt)
+#     img2_pts.append(kp2[match.trainIdx].pt)
+    
