@@ -1,12 +1,14 @@
 import cv2, glob, imutils, os, shutil
 import numpy as np
-from utils import crop_black, get_four_corners, filter_matches, perspective_transform, sort_imgs_str
+from utils import black_percentage, crop_black, get_four_corners, filter_matches
+from utils import perspective_transform, perspective_transform_and_resize, sort_imgs_str
 
 class StitchingClip():
     def __init__(self, clip_path):
         self.clip_path = clip_path
         self.frames_path = "data/images"
         self.output_path = "data/output"
+        self.rewind = 6
         
     def extract_frames(self, rotate=None):
         if not os.path.exists(self.frames_path):
@@ -81,39 +83,40 @@ class StitchingClip():
         img_list = glob.glob('data/images/*.png')
         img_list = sort_imgs_str(img_list)
         
-        prev = cv2.imread(img_list[0])        
-        for i in range(1, 16):
+        prev = cv2.imread(img_list[0]) 
+        crop_list = []
+        for i in range(1, len(img_list)):
             curr = cv2.imread(img_list[i])
             stitched_img = self.stitch(prev, curr)
+            cv2.imwrite(f'test{i}.png', prev)
             crop_img = crop_black(stitched_img)
             print(f'Stitch frame{i} and frame{i-1} successfully')
             crop_img = imutils.resize(crop_img, height=curr.shape[0])
-            prev = crop_img
-        crop_img = perspective_transform(crop_img, get_four_corners(crop_img, mode='left_bottom'))
-        crop_img = perspective_transform(crop_img, get_four_corners(crop_img, mode='bottom_left'))
-        crop_img = imutils.resize(crop_img, height=curr.shape[0])
-        cv2.imwrite('data/output/out_left.png', crop_img)
+            # print(black_percentage(crop_img))
+            if black_percentage(crop_img) > 60:
+                # try to stitch the next image to see if the image is broken
+                if (i+1) != (len(img_list)-1) and black_percentage(self.stitch(crop_img, cv2.imread(img_list[i+1]))) > 90:
+                    crop_img = perspective_transform_and_resize(crop_img)
+                    crop_list.append(crop_img)
+                    cv2.imwrite(f'data/output/out_part_{len(crop_list)}.png', crop_img)
+                    print('Store data and warp')
+                    prev = self.stitch_list(img_list[i-self.rewind : (i + 1)], resize = True)
+                else:
+                    prev = crop_img
+            else:
+                prev = crop_img
         
-        prev = cv2.imread(img_list[10])        
-        for i in range(11, len(img_list)):
-            curr = cv2.imread(img_list[i])
-            stitched_img = self.stitch(prev, curr)
-            crop_img = crop_black(stitched_img)
-            print(f'Stitch frame{i} and frame{i-1} successfully')
-            crop_img = imutils.resize(crop_img, height=curr.shape[0])
-            prev = crop_img
-        crop_img = perspective_transform(crop_img, get_four_corners(crop_img, mode='left_bottom'))
-        crop_img = perspective_transform(crop_img, get_four_corners(crop_img, mode='bottom_left'))
-        crop_img = imutils.resize(crop_img, height=curr.shape[0])
-        cv2.imwrite('data/output/out_right.png', crop_img)
         
-        img1 = cv2.imread('data/output/out_left.png')
-        img2 = cv2.imread('data/output/out_right.png')
-        img3 = stitch_clip.stitch(img1, img2)
-        img4 = crop_black(img3)
-        img4 = perspective_transform(img4, get_four_corners(img4, mode='left_bottom'))
-        img4 = perspective_transform(img4, get_four_corners(img4, mode='bottom_left'))
-        cv2.imwrite('data/output/out.png', img4)
+        crop_img = perspective_transform_and_resize(crop_img)
+        crop_list.append(crop_img)
+        for i in range(len(crop_list)):
+            cv2.imwrite(f'data/output/croppp{i}.png', crop_list[i])
+        final_img = self.stitch_list(crop_list, resize = False)
+        final_img = crop_black(final_img)
+        cv2.imwrite('pre_final.png', final_img)
+        final_img = perspective_transform(final_img, get_four_corners(final_img, mode='left_bottom'))
+        final_img = perspective_transform(final_img, get_four_corners(final_img, mode='bottom_left'))
+        cv2.imwrite('data/output/out.png', final_img)
         
         print('Stitching completed')
     
@@ -199,6 +202,20 @@ class StitchingClip():
                 if np.any(img2[i + y_min][j + x_min]):
                     img_output[i][j] = img2[i + y_min][j + x_min]
         return img_output
+    
+    def stitch_list(self, list_imgs, resize):
+        """ stitching list of images, not do perspective transform"""
+        assert len(list_imgs) > 0, "too few images"
+        
+        prev = cv2.imread(list_imgs[0]) if isinstance(list_imgs[0], str) else list_imgs[0]
+        for i in range(1, len(list_imgs)):
+            curr = cv2.imread(list_imgs[i]) if isinstance(list_imgs[i], str) else list_imgs[i]
+            stitched_img = self.stitch(prev, curr)
+            crop_img = crop_black(stitched_img)
+            if resize:
+                crop_img = imutils.resize(crop_img, height=curr.shape[0])
+            prev = crop_img
+        return crop_img
     
 if __name__ == '__main__':
     stitch_clip = StitchingClip(clip_path = "data/vids/IMG_5820.MOV")

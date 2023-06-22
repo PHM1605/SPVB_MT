@@ -1,4 +1,4 @@
-import cv2
+import cv2, imutils
 import numpy as np
 from scipy import stats
 
@@ -7,6 +7,23 @@ def find_threshold_img(img):
     # apply thresholding to convert grayscale to binary image
     ret,thresh = cv2.threshold(gray,1,255,0)
     return thresh
+
+def black_percentage(img, mode='color'):
+    """ 
+    Count percentage of black pixels
+    Args:
+        mode: 'color', 'gray', 'binary'
+    """
+    if mode == 'color':
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY)[1]
+    elif mode == 'gray':
+        thresh = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY)[1]
+    else:
+        thresh = img
+    area = thresh.shape[0] * thresh.shape[1]
+    black_count = area - cv2.countNonZero(thresh)
+    return np.round(black_count / area * 100, 2)
 
 def crop_black(img):
     """Crop off the black edges."""
@@ -128,6 +145,13 @@ def perspective_transform(img, corners):
     M = cv2.getPerspectiveTransform(input_pts, output_pts)
     out = cv2.warpPerspective(img, M, (max_width, max_height), flags = cv2.INTER_LINEAR)
     return out
+
+def perspective_transform_and_resize(img):
+    curr_height = img.shape[0]
+    img = perspective_transform(img, get_four_corners(img, mode='left_bottom'))
+    img = perspective_transform(img, get_four_corners(img, mode='bottom_left'))
+    img = imutils.resize(img, height=curr_height)
+    return img
 
 def sort_imgs_str(img_names):
     return sorted(img_names, key=lambda x: int(x.split('.')[0].rsplit('frame')[-1]))
