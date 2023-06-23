@@ -4,8 +4,8 @@ from scipy import stats
 
 def find_threshold_img(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # apply thresholding to convert grayscale to binary image
-    ret,thresh = cv2.threshold(gray,1,255,0)
+    # blur = cv2.GaussianBlur(gray, (13, 13), 0)
+    ret, thresh = cv2.threshold(gray, 1, 255, 0)
     return thresh
 
 def black_percentage(img, mode='color'):
@@ -26,6 +26,28 @@ def black_percentage(img, mode='color'):
     return np.round(black_count / area * 100, 2)
 
 def crop_black(img):
+    edge_crop = 20
+    
+    sub_img = img.copy()
+    sub_img = sub_img[:, edge_crop:img.shape[1]-edge_crop]
+    thresh = find_threshold_img(sub_img)
+    thresh_upper = thresh[: int(img.shape[0]/2), :]
+    thresh_lower = thresh[int(img.shape[0]/2):, :]
+    upper_limit = []
+    lower_limit = []
+    for x in range(thresh_upper.shape[1]):
+        for y in range(thresh_upper.shape[0]):
+            if thresh_upper[y,x] > 0:
+                upper_limit.append(y)
+                break
+        for y in range(thresh_lower.shape[0]-1, 0, -1):
+            if thresh_lower[y,x] > 0:
+                lower_limit.append(y + int(img.shape[0]/2))
+                break
+    img = img[max(upper_limit):min(lower_limit), :]
+    return img
+
+def crop_edge(img):
     """Crop off the black edges."""
     thresh = find_threshold_img(img)
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)

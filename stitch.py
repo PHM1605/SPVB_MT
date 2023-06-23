@@ -1,6 +1,6 @@
 import cv2, glob, imutils, os, shutil
 import numpy as np
-from utils import black_percentage, crop_black, get_four_corners, filter_matches
+from utils import black_percentage, crop_black, crop_edge, get_four_corners, filter_matches
 from utils import perspective_transform, perspective_transform_and_resize, sort_imgs_str
 
 class StitchingClip():
@@ -8,6 +8,10 @@ class StitchingClip():
         self.clip_path = clip_path
         self.frames_path = "data/images"
         self.output_path = "data/output"
+        self.clip_name = os.path.basename(self.clip_path)
+        self.folder_name = self.clip_name.split('.')[0]
+        # if not os.path.exists(os.path.join(self.output_path, self.folder_name)):
+        #     os.makedirs(os.path.join(self.output_path, self.folder_name))
         self.rewind = 6
         
     def extract_frames(self, rotate=None):
@@ -15,13 +19,15 @@ class StitchingClip():
             os.makedirs(self.frames_path)
             
         if len(os.listdir(self.frames_path)) > 0:
+            shutil.rmtree(self.frames_path)
+            os.makedirs(self.frames_path)
             
-            user_input = input("Folder images is not empty -> erase all images to run (y/n?): ")
-            if user_input == 'y':
-                shutil.rmtree(self.frames_path)
-                os.makedirs(self.frames_path)
-            elif user_input == 'n':
-                return
+            # user_input = input("Folder images is not empty -> erase all images to run (y/n?): ")
+            # if user_input == 'y':
+            #     shutil.rmtree(self.frames_path)
+            #     os.makedirs(self.frames_path)
+            # elif user_input == 'n':
+            #     return
 
         vid_cap = cv2.VideoCapture(self.clip_path)
         sift = cv2.SIFT_create()
@@ -88,17 +94,16 @@ class StitchingClip():
         for i in range(1, len(img_list)):
             curr = cv2.imread(img_list[i])
             stitched_img = self.stitch(prev, curr)
-            cv2.imwrite(f'test{i}.png', prev)
-            crop_img = crop_black(stitched_img)
+            #cv2.imwrite(f'test{i}.png', prev)
+            crop_img = crop_edge(stitched_img)
             print(f'Stitch frame{i} and frame{i-1} successfully')
             crop_img = imutils.resize(crop_img, height=curr.shape[0])
             # print(black_percentage(crop_img))
             if black_percentage(crop_img) > 60:
                 # try to stitch the next image to see if the image is broken
-                if (i+1) != (len(img_list)-1) and black_percentage(self.stitch(crop_img, cv2.imread(img_list[i+1]))) > 90:
+                if (i+1) != (len(img_list)-1) and black_percentage(self.stitch(crop_img, cv2.imread(img_list[i+1]))) > 90 :
                     crop_img = perspective_transform_and_resize(crop_img)
                     crop_list.append(crop_img)
-                    cv2.imwrite(f'data/output/out_part_{len(crop_list)}.png', crop_img)
                     print('Store data and warp')
                     prev = self.stitch_list(img_list[i-self.rewind : (i + 1)], resize = True)
                 else:
@@ -106,19 +111,25 @@ class StitchingClip():
             else:
                 prev = crop_img
         
-        
         crop_img = perspective_transform_and_resize(crop_img)
         crop_list.append(crop_img)
-        for i in range(len(crop_list)):
-            cv2.imwrite(f'data/output/croppp{i}.png', crop_list[i])
-        final_img = self.stitch_list(crop_list, resize = False)
+        #for i, crop in enumerate(crop_list):
+        #    cv2.imwrite(f'data/output/out_part_{i}.png', crop)
+        assert len(crop_list) <= 2, 'Too long video'
+        if len(crop_list) == 2:
+            final_img = self.stitch_short(crop_list[0], crop_list[1])
+        else:
+            final_img = crop_list[0]
+        final_img = crop_edge(final_img)
+        try:
+            final_img = perspective_transform(final_img, get_four_corners(final_img, mode='left_bottom'))
+            final_img = perspective_transform(final_img, get_four_corners(final_img, mode='bottom_left'))
+        except:
+            pass
         final_img = crop_black(final_img)
-        cv2.imwrite('pre_final.png', final_img)
-        final_img = perspective_transform(final_img, get_four_corners(final_img, mode='left_bottom'))
-        final_img = perspective_transform(final_img, get_four_corners(final_img, mode='bottom_left'))
-        cv2.imwrite('data/output/out.png', final_img)
+        cv2.imwrite(os.path.join(self.output_path, self.folder_name+'.png'), final_img)
         
-        print('Stitching completed')
+        print(f'Stitching completed for {self.folder_name}')
     
     
     def stitch(self, prev, curr, draw_matches=False):
@@ -153,14 +164,30 @@ class StitchingClip():
         
         # Compute the Homography matrix
         H, mask = cv2.findHomography(img1_pts, img2_pts, cv2.RANSAC, 5.0)
+        stitched_img = self.stitch_by_H(prev, curr, H)
+        return stitched_img
+    
+    def stitch_short(self, prev, curr):
+        sift = cv2.SIFT_create()
+        kp1, des1 = sift.detectAndCompute(prev, None)
+        kp2, des2 = sift.detectAndCompute(curr, None)
+        bf = cv2.BFMatcher(normType=cv2.NORM_L2)
+        matches = bf.knnMatch(des1, des2, k=2)
+        valid_matches = filter_matches(matches, kp1, kp2)
+                
+        # Extract the coordinates of matching points
+        img1_pts = []
+        img2_pts = []
+        for match in valid_matches:
+            img1_pts.append(kp1[match.queryIdx].pt)
+            img2_pts.append(kp2[match.trainIdx].pt)
         
-        # # Recompute the Homography in order to improve robustness
-        # for i in range(mask.shape[0] - 1, -1, -1):
-        #     if mask[i] == 0:
-        #         np.delete(img1_pts, [i], axis=0)
-        #         np.delete(img2_pts, [i], axis=0)
+        # Formalize as matrices (for the sake of computing Homography)
+        img1_pts = np.float32(img1_pts).reshape(-1, 1, 2)
+        img2_pts = np.float32(img2_pts).reshape(-1, 1, 2)
         
-        # H, mask = cv2.findHomography(img1_pts, img2_pts, cv2.RANSAC, 5.0)
+        # Compute the Homography matrix
+        H, mask = cv2.findHomography(img1_pts, img2_pts, cv2.RANSAC, 5.0)
         stitched_img = self.stitch_by_H(prev, curr, H)
         return stitched_img
     
@@ -211,13 +238,16 @@ class StitchingClip():
         for i in range(1, len(list_imgs)):
             curr = cv2.imread(list_imgs[i]) if isinstance(list_imgs[i], str) else list_imgs[i]
             stitched_img = self.stitch(prev, curr)
-            crop_img = crop_black(stitched_img)
+            crop_img = crop_edge(stitched_img)
             if resize:
                 crop_img = imutils.resize(crop_img, height=curr.shape[0])
             prev = crop_img
         return crop_img
     
 if __name__ == '__main__':
-    stitch_clip = StitchingClip(clip_path = "data/vids/IMG_5820.MOV")
-    stitch_clip.extract_frames(rotate= cv2.ROTATE_90_CLOCKWISE)
-    stitch_clip.run()
+    vid_list = glob.glob('data/vids/*.MOV')
+    for vid in vid_list:
+        stitch_clip = StitchingClip(clip_path = vid)
+        stitch_clip.extract_frames(rotate= cv2.ROTATE_90_CLOCKWISE)
+        stitch_clip.run()
+    
