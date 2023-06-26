@@ -1,53 +1,102 @@
-import cv2, imutils
+import os, cv2, copy
 import numpy as np
 from scipy import stats
+from PIL import ImageFont, ImageDraw, Image
+
+def calculate_overlap(box1, box2):
+    a, b = box1, box2
+    dx = min(a.x2, b.x2) - max(a.x1, b.x1)
+    dy = min(a.y2, b.y2) - max(a.y1, b.y1)
+    min_area = min(a.area, b.area)
+    if dx >= 0 and dy >= 0:
+        return dx * dy / min_area
+    else:
+        return 0
+
+def remove_overlap_boxes(boxes, exclude_indices):
+    flag = [True for _ in boxes]
+    thres = 0.3  # new
+    for i, box in enumerate(boxes):
+        if flag[i] == False:
+            continue
+        for j, other_box in enumerate(boxes):
+            if i in exclude_indices or j in exclude_indices or i == j:
+                continue
+            overlap_area = calculate_overlap(box, other_box)
+            if overlap_area > thres:
+                flag[i] = True
+                flag[j] = False
+    return [boxes[i] for i in range(len(boxes)) if flag[i]]
+
+def sort_upper_to_lower(boxes, indices):
+    list_boxes = [(idx, boxes[idx]) for idx in indices]
+    list_boxes.sort(key=lambda shelf: shelf[1].y1)
+    indices = [box[0] for box in list_boxes]
+    return indices
+
+# Vietnamese display on image
+def put_text(img, text, loc):
+    img_pil = Image.fromarray(img)
+    draw = ImageDraw.Draw(img_pil)
+    font = ImageFont.truetype(os.path.join("fonts", "SVN-Arial 2.ttf"), 14)
+    draw.text(loc, text, font=font, fill=(0, 255, 255))
+    return np.array(img_pil)
+
+
+def draw_result(img, boxes, color, put_label, put_percent):
+    ret = copy.deepcopy(img)
+    for i, box in enumerate(boxes):
+        thickness = 2
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        ret = cv2.rectangle(ret, (box.x1, box.y1), (box.x2, box.y2), color, thickness)
+        if put_label:
+            ret = cv2.putText(
+                ret,
+                box.label,
+                (box.x1, box.y1 + 20),
+                font,
+                0.6,
+                color,
+                thickness,
+            )
+        if put_percent:
+            ret = cv2.putText(
+                ret,
+                str(round(box.prob, 2)),
+                (box.x1, box.y1),
+                font,
+                0.6,
+                color,
+                thickness,
+            )
+    return ret
+
+
+# count number of items from a list of items
+def count_item(item, list_items):
+    count = 0
+    for it in list_items:
+        if item == it:
+            count += 1
+    return count
+
+
+def search_bounding_boxes(boxes, label):
+    ret = []
+    for box in boxes:
+        if box.label == label:
+            ret.append([box.x1, box.y1, box.x2, box.y2])
+    return ret
+
+
 
 def find_threshold_img(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # blur = cv2.GaussianBlur(gray, (13, 13), 0)
-    ret, thresh = cv2.threshold(gray, 1, 255, 0)
+    # apply thresholding to convert grayscale to binary image
+    ret,thresh = cv2.threshold(gray,1,255,0)
     return thresh
 
-def black_percentage(img, mode='color'):
-    """ 
-    Count percentage of black pixels
-    Args:
-        mode: 'color', 'gray', 'binary'
-    """
-    if mode == 'color':
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY)[1]
-    elif mode == 'gray':
-        thresh = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY)[1]
-    else:
-        thresh = img
-    area = thresh.shape[0] * thresh.shape[1]
-    black_count = area - cv2.countNonZero(thresh)
-    return np.round(black_count / area * 100, 2)
-
 def crop_black(img):
-    edge_crop = 20
-    
-    sub_img = img.copy()
-    sub_img = sub_img[:, edge_crop:img.shape[1]-edge_crop]
-    thresh = find_threshold_img(sub_img)
-    thresh_upper = thresh[: int(img.shape[0]/2), :]
-    thresh_lower = thresh[int(img.shape[0]/2):, :]
-    upper_limit = []
-    lower_limit = []
-    for x in range(thresh_upper.shape[1]):
-        for y in range(thresh_upper.shape[0]):
-            if thresh_upper[y,x] > 0:
-                upper_limit.append(y)
-                break
-        for y in range(thresh_lower.shape[0]-1, 0, -1):
-            if thresh_lower[y,x] > 0:
-                lower_limit.append(y + int(img.shape[0]/2))
-                break
-    img = img[max(upper_limit):min(lower_limit), :]
-    return img
-
-def crop_edge(img):
     """Crop off the black edges."""
     thresh = find_threshold_img(img)
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
@@ -168,13 +217,6 @@ def perspective_transform(img, corners):
     out = cv2.warpPerspective(img, M, (max_width, max_height), flags = cv2.INTER_LINEAR)
     return out
 
-def perspective_transform_and_resize(img):
-    curr_height = img.shape[0]
-    img = perspective_transform(img, get_four_corners(img, mode='left_bottom'))
-    img = perspective_transform(img, get_four_corners(img, mode='bottom_left'))
-    img = imutils.resize(img, height=curr_height)
-    return img
-
 def sort_imgs_str(img_names):
     return sorted(img_names, key=lambda x: int(x.split('.')[0].rsplit('frame')[-1]))
 
@@ -182,4 +224,3 @@ if __name__ == '__main__':
     img = cv2.imread('out_without_crop_1.jpg')
     [top_left, top_right, bottom_right, bottom_left] = get_four_corners(img, mode='bottom_left')
     draw_points(img, [top_left, top_right, bottom_right, bottom_left], 'test.jpg')
-

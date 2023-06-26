@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 3
+names: ['SPVB', 'Splitline', 'TH']
+
+roboflow:
+  workspace: hoang-minh-pham-6qdrp
+  project: spvbtest
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/hoang-minh-pham-6qdrp/spvbtest/dataset/1

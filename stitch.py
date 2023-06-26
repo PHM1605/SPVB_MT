@@ -128,9 +128,8 @@ class StitchingClip():
             pass
         final_img = crop_black(final_img)
         cv2.imwrite(os.path.join(self.output_path, self.folder_name+'.png'), final_img)
-        
         print(f'Stitching completed for {self.folder_name}')
-    
+        return final_img
     
     def stitch(self, prev, curr, draw_matches=False):
         sift = cv2.SIFT_create()
@@ -248,6 +247,7 @@ if __name__ == '__main__':
     vid_list = glob.glob('data/vids/*.MOV')
     for vid in vid_list:
         stitch_clip = StitchingClip(clip_path = vid)
-        stitch_clip.extract_frames(rotate= cv2.ROTATE_90_CLOCKWISE)
+        #stitch_clip.extract_frames(rotate= cv2.ROTATE_90_CLOCKWISE)
+        stitch_clip.extract_frames(rotate=None)
         stitch_clip.run()
     
