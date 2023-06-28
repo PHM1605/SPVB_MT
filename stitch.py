@@ -1,6 +1,6 @@
 import cv2, glob, imutils, os, shutil
 import numpy as np
-from utils import black_percentage, crop_black, crop_edge, get_four_corners, filter_matches, get_slope
+from utils import crop_black, crop_edge, get_four_corners, filter_matches, get_slope
 from utils import perspective_transform, perspective_transform_and_resize, sort_imgs_str
 
 class StitchingClip():
@@ -80,6 +80,7 @@ class StitchingClip():
                         print("Captured frame{}.png".format(frame_num))
                         cv2.imwrite('data/images/frame%d.png' % frame_num, last)
                         frame_num += 1
+
             success, image = vid_cap.read()
             if rotate is not None:
                 image = cv2.rotate(image, rotate)
@@ -94,30 +95,21 @@ class StitchingClip():
         for i in range(1, len(img_list)):
             curr = cv2.imread(img_list[i])
             stitched_img = self.stitch(prev, curr)
-            #cv2.imwrite(f'test{i}.png', prev)
             crop_img = crop_edge(stitched_img)
             print(f'Stitch frame{i} and frame{i-1} successfully')
             crop_img = imutils.resize(crop_img, height=curr.shape[0])
             cv2.imwrite(f'frame_{i}.png', crop_img)
-            print(get_slope(crop_img))
+            # print(get_slope(crop_img))
             if get_slope(crop_img) < 0.8:
                 crop_img = perspective_transform_and_resize(crop_img)
                 crop_list.append(crop_img)
                 print('Store data and warp')
                 prev = self.stitch_list(img_list[i-self.rewind : (i + 1)], resize = True)
-            #if black_percentage(crop_img[:, :int(crop_img.shape[1]/2)]) > 60:
-                # # try to stitch the next image to see if the image is broken
-                # if (i+1) != (len(img_list)) and black_percentage(self.stitch(crop_img, cv2.imread(img_list[i+1]))) > 90 :
-                #     crop_img = perspective_transform_and_resize(crop_img)
-                #     crop_list.append(crop_img)
-                #     print('Store data and warp')
-                #     prev = self.stitch_list(img_list[i-self.rewind : (i + 1)], resize = True)
-                # else:
-                #     prev = crop_img
             else:
                 prev = crop_img
         
-        crop_img = perspective_transform_and_resize(crop_img)
+        if i != (len(img_list)-1):
+            crop_img = perspective_transform_and_resize(crop_img)
         crop_list.append(crop_img)
         #for i, crop in enumerate(crop_list):
         #    cv2.imwrite(f'data/output/out_part_{i}.png', crop)
@@ -265,6 +257,6 @@ if __name__ == '__main__':
     #     #stitch_clip.extract_frames(rotate= cv2.ROTATE_90_CLOCKWISE)
     #     stitch_clip.extract_frames(rotate=None)
     #     stitch_clip.run()
-    stitch_clip = StitchingClip(clip_path = 'data/vids/1687931809010.MP4')
+    stitch_clip = StitchingClip(clip_path = 'data/vids/IMG_5820.MOV')
     stitch_clip.extract_frames(rotate=None)
     stitch_clip.run()
