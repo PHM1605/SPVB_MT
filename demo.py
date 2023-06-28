@@ -2,7 +2,7 @@
 from tkinter import Button, Label, Tk
 from PIL import Image
 from PIL import ImageTk
-from tkinter import filedialog as tkFileDialog
+from tkinter import filedialog
 import cv2
 from stitch import StitchingClip
 
@@ -10,7 +10,7 @@ def select_image():
     # grab a reference to the image panels
     global panelA
     # open a file chooser dialog and allow the user to select an input image
-    path = tkFileDialog.askopenfilename()
+    path = filedialog.askopenfilename()
     # ensure a file path was selected
     if len(path) > 0:
         # load the image from disk
@@ -39,7 +39,7 @@ class DemoSPVBApp():
         self.root.mainloop()
     
     def select_vid(self):
-        self.path = tkFileDialog.askopenfilename()
+        self.path = filedialog.askopenfilename()
         self.run()
             
     def init_view(self):

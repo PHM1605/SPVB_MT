@@ -1,97 +1,72 @@
 import cv2, copy
 import tkinter as tk
-from tkinter import Button, Label
+from tkinter import Button, Canvas, Label, LabelFrame
 from PIL import Image, ImageTk
 
 class View():
     def __init__(self, controller, root):
-        self.controller = controller
         self.root = root
-        self.frame = tk.Frame(root)
-        self.frame.pack()
+        self.controller = controller
         self.curr_img = None
-
-        self.create_top_bar(root)
-        self.create_left_bar(root)
-        self.create_drawing_canvas(root)
-            
-
-    def create_left_bar(self, root):
-        self.left_bar = tk.Frame(root, width = 150, relief = 'raised', bg = '#65A8E1')
-        self.left_bar.pack(fill = 'y', side = 'left')
-        self.structure_left_bar()
+        self.img_shape = [1280, 720]
+        self.create_status_bar()
+        self.create_left_bar()
+        self.create_drawing_canvas()
         
-    def structure_left_bar(self):        
-        # CAPTURE button
-        self.button_capture = Button(self.left_bar, text = 'CAPTURE', height = 6, width = 21)
-        self.button_capture.bind('<Button-1>', self.controller.on_btn_capture)
-        self.button_capture.pack(side = 'top', padx = 2, pady = 6)        
 
-        # RESULT label
-        self.result_lab = Label(self.left_bar, borderwidth=2, relief="groove", text = 'PASS/ FAIL', height = 6, width = 21)
-        self.result_lab.pack(side="top", padx = 2, pady = 6)          
-    
-    def create_top_bar(self, root):
-        self.top_bar = tk.Frame(root, height=25, relief="raised", bg = '#65A8E1')
-        self.top_bar.pack( fill="x", side="top")
-        self.structure_top_bar()
+    def create_status_bar(self):
+        self.top_bar = LabelFrame(self.root)
+        self.top_bar.grid(row = 0, column = 0, columnspan = 2, sticky = 'W')
+        Label(self.top_bar, text = 'STATUS: ', font = ('Courier', 15, 'bold')).grid(row=0, column=0, sticky='W')
+        self.status = Label(self.top_bar, text = '', font = ('Courier', 15))
+        self.status.grid(row=0, column=1, sticky='W')
+        
+        for child in self.top_bar.winfo_children():
+            child.grid_configure(padx = 5, pady = 5, ipadx = 5, ipady = 5)
 
-    def structure_top_bar(self):
-        self.barcode_lb = Label(self.top_bar, text = 'Status', height = 1, width = 8)
-        self.barcode_lb.pack(side="left",padx = 2, pady = 1)
+    def create_left_bar(self):
+        self.left_bar = LabelFrame(self.root)
+        self.left_bar.grid(row=1, column=0)
+        # Analyze button
+        self.analyze_btn = Button(self.left_bar, text='Analyze', width=16, height=4, font=('Courier', 16, 'bold'))
+        self.analyze_btn.bind('<Button-1>', self.controller.on_btn_analyze)
+        self.analyze_btn.grid(row=0, column=0)
+        # Display result
+        self.stat_frame = LabelFrame(self.left_bar, width=16, height = 6)
+        self.stat_frame.grid(row=1, column=0)
+        fontSize = 10
+        Label(self.stat_frame, text = 'SPVB: ', font = ('Courier', fontSize)).grid(row = 0, column = 0)
+        Label(self.stat_frame, text = 'NonSPVB: ', font = ('Courier', fontSize)).grid(row = 1, column = 0)
+        Label(self.stat_frame, text = 'SOS (%): ', font = ('Courier', fontSize)).grid(row = 2, column = 0)
+        self.num_spvb = Label(self.stat_frame, text = '', font = ('Courier', fontSize))
+        self.num_spvb.grid(row = 0, column = 1)
+        self.num_others = Label(self.stat_frame, text = '', font = ('Courier', fontSize))
+        self.num_others.grid(row = 1, column = 1)
+        self.sos = Label(self.stat_frame, text = '', font = ('Courier', fontSize))
+        self.sos.grid(row = 2, column = 1)
         
-        # BARCODE label
-        self.barcode_text = Label(self.top_bar, borderwidth=2, relief="groove", text = '', height = 1, width = 30)
-        self.barcode_text.pack(side="left", padx = 2, pady = 1) 
+        for child in self.left_bar.winfo_children():
+            child.grid_configure(padx = 5, pady = 5, ipadx = 5, ipady = 5)
         
-    def create_drawing_canvas(self, root):
-        self.canvas = tk.Frame(root)
-        self.canvas.pack(side = 'right', expand = 'yes', fill = 'both')
-        
-        self.img_canvas = tk.Canvas(self.canvas, background = 'Lavender', width = 864, height = 648)
-        self.img_canvas.pack(side = 'right', expand = 'yes', fill = 'both')
+    def create_drawing_canvas(self):        
+        self.img_canvas = Canvas(self.root, width = self.img_shape[0], height = self.img_shape[1])
+        self.img_canvas.grid(row = 1, column = 1, sticky = 'NSWE')
+
+    # resize and convert from cv2 image to image suitable for tk
+    def convert_image_to_display(self, img):
+        img = cv2.resize(img, tuple(self.img_shape))
+        conv_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        pil_img = Image.fromarray(conv_img)
+        tk_img = ImageTk.PhotoImage(pil_img)
+        return tk_img
     
     def update_canvas(self, img):
         global tk_img
         tk_img = self.convert_image_to_display(img)
         self.img_canvas.create_image(0, 0, anchor = 'nw', image = tk_img)
         self.img_canvas.update()
-
-    # resize and convert from cv2 image to image suitable for tk
-    def convert_image_to_display(self, img):
-        img = cv2.resize(img, (864, 648))
-        conv_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        pil_img = Image.fromarray(conv_img)
-        tk_img = ImageTk.PhotoImage(pil_img)
-        return tk_img
     
-    def draw_result(self):
-        img1 = copy.deepcopy(self.curr_img)
-        dh, dw = self.controller.img_shape
-        
-        radiatorList = [comp for comp in self.controller.comps if comp.name == 'Radiator']
-        barcodeList = [comp for comp in self.controller.comps if comp.name == 'BarCode']
-        for iRadiator, radiator in enumerate(radiatorList):
-            if self.controller.preds[iRadiator] == radiator.label:
-                color = (0, 255, 0) # green
-            else:
-                color = (0, 0, 255) # red
-            x, y, w, h = radiator.box[0], radiator.box[1], radiator.box[2], radiator.box[3]   
-            image = cv2.rectangle(img1, (x, y), (x + w, y + h), color, 5) 
-            cv2.putText(img1,'#' + str(radiator.label) , (x, y-5) , cv2.FONT_HERSHEY_SIMPLEX, 2, color, 2, cv2.LINE_AA)
-        
-        for iBarcode, barcode in enumerate(barcodeList):
-            color = (255, 0, 0)
-            x, y, w, h = barcode.box[0], barcode.box[1], barcode.box[2], barcode.box[3]
-            image = cv2.rectangle(image, (x - 10, y - 10), (x + w + 10, y + h + 10), color, 5)
-        
-        self.update_canvas(image)
-        return image
-    
-    def update_result(self, ok_flag):
-        if ok_flag:
-            self.result_lab['text'] = 'PASS'
-            self.result_lab['bg'] = 'green'
-        else:
-            self.result_lab['text'] = 'FAIL'
-            self.result_lab['bg'] = 'red'     
+    def update_result(self, sos_dict):
+        self.num_spvb['text'] = str(sos_dict['SPVB'])
+        self.num_others['text'] = str(sos_dict['NonSPVB'])
+        self.sos['text'] = str(sos_dict['sos'])

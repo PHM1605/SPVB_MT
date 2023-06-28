@@ -1,6 +1,6 @@
 import cv2, glob, imutils, os, shutil
 import numpy as np
-from utils import black_percentage, crop_black, crop_edge, get_four_corners, filter_matches
+from utils import black_percentage, crop_black, crop_edge, get_four_corners, filter_matches, get_slope
 from utils import perspective_transform, perspective_transform_and_resize, sort_imgs_str
 
 class StitchingClip():
@@ -40,7 +40,7 @@ class StitchingClip():
         frame_num = 1
 
         w = int(last.shape[1] * 2 / 3)  # the region to detect matching points
-        stride = 30   # stride for accelerating capturing
+        stride = 40   # stride for accelerating capturing
         min_match_num = 50 # minimum number of matches required (to stitch well)
         max_match_num = 900  # maximum number of matches (to avoid redundant frames)
         image = None
@@ -89,7 +89,7 @@ class StitchingClip():
         img_list = glob.glob('data/images/*.png')
         img_list = sort_imgs_str(img_list)
         
-        prev = cv2.imread(img_list[0]) 
+        prev = cv2.imread(img_list[0])
         crop_list = []
         for i in range(1, len(img_list)):
             curr = cv2.imread(img_list[i])
@@ -98,16 +98,22 @@ class StitchingClip():
             crop_img = crop_edge(stitched_img)
             print(f'Stitch frame{i} and frame{i-1} successfully')
             crop_img = imutils.resize(crop_img, height=curr.shape[0])
-            # print(black_percentage(crop_img))
-            if black_percentage(crop_img) > 60:
-                # try to stitch the next image to see if the image is broken
-                if (i+1) != (len(img_list)-1) and black_percentage(self.stitch(crop_img, cv2.imread(img_list[i+1]))) > 90 :
-                    crop_img = perspective_transform_and_resize(crop_img)
-                    crop_list.append(crop_img)
-                    print('Store data and warp')
-                    prev = self.stitch_list(img_list[i-self.rewind : (i + 1)], resize = True)
-                else:
-                    prev = crop_img
+            cv2.imwrite(f'frame_{i}.png', crop_img)
+            print(get_slope(crop_img))
+            if get_slope(crop_img) < 0.8:
+                crop_img = perspective_transform_and_resize(crop_img)
+                crop_list.append(crop_img)
+                print('Store data and warp')
+                prev = self.stitch_list(img_list[i-self.rewind : (i + 1)], resize = True)
+            #if black_percentage(crop_img[:, :int(crop_img.shape[1]/2)]) > 60:
+                # # try to stitch the next image to see if the image is broken
+                # if (i+1) != (len(img_list)) and black_percentage(self.stitch(crop_img, cv2.imread(img_list[i+1]))) > 90 :
+                #     crop_img = perspective_transform_and_resize(crop_img)
+                #     crop_list.append(crop_img)
+                #     print('Store data and warp')
+                #     prev = self.stitch_list(img_list[i-self.rewind : (i + 1)], resize = True)
+                # else:
+                #     prev = crop_img
             else:
                 prev = crop_img
         
@@ -115,9 +121,16 @@ class StitchingClip():
         crop_list.append(crop_img)
         #for i, crop in enumerate(crop_list):
         #    cv2.imwrite(f'data/output/out_part_{i}.png', crop)
-        assert len(crop_list) <= 2, 'Too long video'
+        assert len(crop_list) <= 4, 'Too long video'
         if len(crop_list) == 2:
             final_img = self.stitch_short(crop_list[0], crop_list[1])
+        elif len(crop_list) == 3:
+            final_img = self.stitch_short(crop_list[0], crop_list[1])
+            final_img = self.stitch_short(final_img, crop_list[2])
+        elif len(crop_list) == 4:
+            final_img = self.stitch_short(crop_list[0], crop_list[1])
+            final_img = self.stitch_short(final_img, crop_list[2])
+            final_img = self.stitch_short(final_img, crop_list[3])
         else:
             final_img = crop_list[0]
         final_img = crop_edge(final_img)
@@ -128,14 +141,16 @@ class StitchingClip():
             pass
         final_img = crop_black(final_img)
         cv2.imwrite(os.path.join(self.output_path, self.folder_name+'.png'), final_img)
-        print(f'Stitching completed for {self.folder_name}')
-        return final_img
+        msg = f'Stitching completed for {self.folder_name}'
+        print(msg)
+        return final_img, msg
     
     def stitch(self, prev, curr, draw_matches=False):
         sift = cv2.SIFT_create()
         h1, w1 = prev.shape[0:2]
         h2, w2 = curr.shape[0:2]
         prev_crop = prev[:, w1-w2:]
+        #prev_crop = prev[:, 500:]
         diff = np.size(prev, axis=1) - np.size(prev_crop, axis = 1)
         kp1, des1 = sift.detectAndCompute(prev_crop, None)
         #kp1, des1 = sift.detectAndCompute(prev, None)
@@ -244,10 +259,12 @@ class StitchingClip():
         return crop_img
     
 if __name__ == '__main__':
-    vid_list = glob.glob('data/vids/*.MOV')
-    for vid in vid_list:
-        stitch_clip = StitchingClip(clip_path = vid)
-        #stitch_clip.extract_frames(rotate= cv2.ROTATE_90_CLOCKWISE)
-        stitch_clip.extract_frames(rotate=None)
-        stitch_clip.run()
-    
+    # vid_list = glob.glob('data/vids/*.MOV')
+    # for vid in vid_list:
+    #     stitch_clip = StitchingClip(clip_path = vid)
+    #     #stitch_clip.extract_frames(rotate= cv2.ROTATE_90_CLOCKWISE)
+    #     stitch_clip.extract_frames(rotate=None)
+    #     stitch_clip.run()
+    stitch_clip = StitchingClip(clip_path = 'data/vids/1687931809010.MP4')
+    stitch_clip.extract_frames(rotate=None)
+    stitch_clip.run()

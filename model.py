@@ -31,9 +31,12 @@ class Yolov8Model():
         return pred_res
 
     def analyze_one_image(self, img_path):
-        img0 = cv2.imread(img_path)
+        if isinstance(img_path, str):
+            img0 = cv2.imread(img_path)
+        else:
+            img0 = img_path
         self.img = img = copy.deepcopy(img0)
-        img_key = os.path.basename(img_path).split(".")[0]
+        # img_key = os.path.basename(img_path).split(".")[0]
         distance_threshold = 1
         
         pred_res = self.predict(img_path)
@@ -60,7 +63,7 @@ class Yolov8Model():
         img = draw_result(
             img,
             [boxes[i] for i in index_dict["shelf"]],
-            color=(253, 0, 100),
+            color=(192, 192, 192),
             put_label=False,
             put_percent=False,
         )
@@ -82,12 +85,11 @@ class Yolov8Model():
             img = draw_result(img, list_bottles_one_shelf_all, color=(0, 255, 0), put_label=True, put_percent=False)
             img = draw_result(img, [shelf], color=(255, 0, 0), put_label=True, put_percent=False)    
             
+        self.res_img = img
+        cv2.imwrite('res.png', img)
         # Calculate Share-Of-Shelf (sos)
-        sos_dict = self.calculate_sos(list_bottles, [boxes[idx] for idx in index_dict['shelf']])
-        print(sos_dict)
-        
-        cv2.imwrite('done.png', img)
-        print('done')
+        self.sos_dict = self.calculate_sos(list_bottles, [boxes[idx] for idx in index_dict['shelf']])
+        return self.sos_dict, self.res_img
         
         
     # which bottles belong to which shelves
@@ -129,4 +131,4 @@ class Yolov8Model():
         
 if __name__ == '__main__':
     model = Yolov8Model()
-    model.analyze_one_image("data/output/IMG_5827.png")
+    model.analyze_one_image("data/output/IMG_5841.png")
