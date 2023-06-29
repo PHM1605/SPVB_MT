@@ -1,10 +1,10 @@
-import cv2, glob, imutils, os, shutil
+import cv2, glob, imutils, os, shutil, time
 import numpy as np
 from utils import crop_black, crop_edge, get_four_corners, filter_matches, get_slope
 from utils import perspective_transform, perspective_transform_and_resize, sort_imgs_str
 
 class StitchingClip():
-    def __init__(self, clip_path):
+    def __init__(self, clip_path, rewind=6, slope_thr=0.8, stride=40):
         self.clip_path = clip_path
         self.frames_path = "data/images"
         self.output_path = "data/output"
@@ -12,7 +12,10 @@ class StitchingClip():
         self.folder_name = self.clip_name.split('.')[0]
         # if not os.path.exists(os.path.join(self.output_path, self.folder_name)):
         #     os.makedirs(os.path.join(self.output_path, self.folder_name))
-        self.rewind = 6
+        self.rewind = rewind
+        self.slope_thr = slope_thr
+        self.stride = stride
+        self.output_name = f'{self.folder_name}_0{int(self.slope_thr*10)}_{str(self.rewind)}_{str(self.stride)}.png'
         
     def extract_frames(self, rotate=None):
         if not os.path.exists(self.frames_path):
@@ -35,12 +38,12 @@ class StitchingClip():
         if rotate is not None:
             last = cv2.rotate(last, rotate)
         cv2.imwrite('data/images/frame0.png', last)
-        print("Captured frame0.png")
+        #print("Captured frame0.png")
         count = 1
         frame_num = 1
 
         w = int(last.shape[1] * 2 / 3)  # the region to detect matching points
-        stride = 40   # stride for accelerating capturing
+        stride = self.stride   # stride for accelerating capturing
         min_match_num = 50 # minimum number of matches required (to stitch well)
         max_match_num = 900  # maximum number of matches (to avoid redundant frames)
         image = None
@@ -77,7 +80,7 @@ class StitchingClip():
 
                     if min_match_num < np.count_nonzero(mask) < max_match_num:
                         last = image
-                        print("Captured frame{}.png".format(frame_num))
+                        #print("Captured frame{}.png".format(frame_num))
                         cv2.imwrite('data/images/frame%d.png' % frame_num, last)
                         frame_num += 1
 
@@ -96,44 +99,34 @@ class StitchingClip():
             curr = cv2.imread(img_list[i])
             stitched_img = self.stitch(prev, curr)
             crop_img = crop_edge(stitched_img)
-            print(f'Stitch frame{i} and frame{i-1} successfully')
+            # print(f'Stitch frame{i} and frame{i-1} successfully')
             crop_img = imutils.resize(crop_img, height=curr.shape[0])
             cv2.imwrite(f'frame_{i}.png', crop_img)
             # print(get_slope(crop_img))
-            if get_slope(crop_img) < 0.8:
-                crop_img = perspective_transform_and_resize(crop_img)
+            if i == (len(img_list) - 1):
+                crop_img = perspective_transform_and_resize(crop_img, resize=True)
+                crop_img = crop_black(crop_img)
                 crop_list.append(crop_img)
-                print('Store data and warp')
+            elif get_slope(crop_img) < self.slope_thr:
+                crop_img = perspective_transform_and_resize(crop_img, resize=True)
+                crop_img = crop_black(crop_img)
+                crop_list.append(crop_img)
+                # print('Store data and warp')
                 prev = self.stitch_list(img_list[i-self.rewind : (i + 1)], resize = True)
             else:
                 prev = crop_img
-        
-        if i != (len(img_list)-1):
-            crop_img = perspective_transform_and_resize(crop_img)
-        crop_list.append(crop_img)
-        #for i, crop in enumerate(crop_list):
-        #    cv2.imwrite(f'data/output/out_part_{i}.png', crop)
-        assert len(crop_list) <= 4, 'Too long video'
-        if len(crop_list) == 2:
-            final_img = self.stitch_short(crop_list[0], crop_list[1])
-        elif len(crop_list) == 3:
-            final_img = self.stitch_short(crop_list[0], crop_list[1])
-            final_img = self.stitch_short(final_img, crop_list[2])
-        elif len(crop_list) == 4:
-            final_img = self.stitch_short(crop_list[0], crop_list[1])
-            final_img = self.stitch_short(final_img, crop_list[2])
-            final_img = self.stitch_short(final_img, crop_list[3])
-        else:
-            final_img = crop_list[0]
+
+        final_img = crop_list[0]
+        for i in range(len(crop_list)):
+            final_img = self.stitch_short(final_img, crop_list[i])
         final_img = crop_edge(final_img)
         try:
-            final_img = perspective_transform(final_img, get_four_corners(final_img, mode='left_bottom'))
-            final_img = perspective_transform(final_img, get_four_corners(final_img, mode='bottom_left'))
+            final_img = perspective_transform_and_resize(final_img, resize = False)
         except:
             pass
         final_img = crop_black(final_img)
-        cv2.imwrite(os.path.join(self.output_path, self.folder_name+'.png'), final_img)
-        msg = f'Stitching completed for {self.folder_name}'
+        cv2.imwrite(os.path.join(self.output_path, self.output_name), final_img)
+        msg = f'Stitching completed for {self.output_name}'
         print(msg)
         return final_img, msg
     
@@ -257,6 +250,17 @@ if __name__ == '__main__':
     #     #stitch_clip.extract_frames(rotate= cv2.ROTATE_90_CLOCKWISE)
     #     stitch_clip.extract_frames(rotate=None)
     #     stitch_clip.run()
-    stitch_clip = StitchingClip(clip_path = 'data/vids/IMG_5820.MOV')
-    stitch_clip.extract_frames(rotate=None)
-    stitch_clip.run()
+    
+    for slope in [0.8, 0.7, 0.6, 0.5]:
+        for rewind in [6, 5, 4]:
+            for stride in [40, 30, 20]:
+                try:
+                    time_start = time.time()
+                    stitch_clip = StitchingClip(clip_path = 'data/vids/IMG_5820.MOV', slope_thr=slope, rewind=rewind, stride=stride)
+                    stitch_clip.extract_frames(rotate=None)
+                    stitch_clip.run()
+                    time_stop = time.time()
+                    elapse = time_stop-time_start
+                    print(f"Elapsed time is {elapse}")
+                except:
+                    print(f'Stitching for {stitch_clip.output_name} failed')

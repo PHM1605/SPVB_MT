@@ -260,11 +260,12 @@ def perspective_transform(img, corners):
     out = cv2.warpPerspective(img, M, (max_width, max_height), flags = cv2.INTER_LINEAR)
     return out
 
-def perspective_transform_and_resize(img):
+def perspective_transform_and_resize(img, resize):
     curr_height = img.shape[0]
     img = perspective_transform(img, get_four_corners(img, mode='left_bottom'))
     img = perspective_transform(img, get_four_corners(img, mode='bottom_left'))
-    img = imutils.resize(img, height=curr_height)
+    if resize:
+        img = imutils.resize(img, height=curr_height)
     return img
 
 def sort_imgs_str(img_names):
