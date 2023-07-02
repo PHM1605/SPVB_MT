@@ -1,21 +1,70 @@
 import copy, cv2, os
 from roboflow import Roboflow
 from indices import get_indices
-from utils import draw_result, remove_overlap_boxes, sort_upper_to_lower
+from utils import BoundingBox, convert_xml_to_boxes, count_group_and_type, draw_result, remove_overlap_boxes, sort_upper_to_lower
 
-class BoundingBox:
-    def __init__(self, res):
-        self.x1 = int(res['x'] - res['width']/2)
-        self.y1 = int(res['y'] - res['height']/2)
-        self.x2 = int(res['x'] + res['width']/2)
-        self.y2 = int(res['y'] + res['height']/2)
-        self.cen_x = res['x']
-        self.cen_y = res['y']
-        self.w = res['width']
-        self.h = res['height']
-        self.prob = res['confidence']
-        self.label = res['class']
-        self.area = self.w * self.h
+params = {'width_one_floor' : 1080,
+          'num_floors': 29}
+groups = ['SPVB', 'NON_SPVB']
+drink_types = ['CSD', 'ED', 'JD', 'TEA', 'WATER']
+
+# This model will load the labelling dict to calculate sos; no deep learning
+class TestModel():
+    def __init__(self):
+        self.xml_file = 'data/samples/IMG_0419_08_5_20.xml'
+        self.result_dict = {'boxes': convert_xml_to_boxes(self.xml_file)}
+        with open('predefined_classes_MT.txt', 'r') as f:
+            self.classes = f.read().splitlines()
+            
+    def analyze_one_image(self, img_path):
+        if isinstance(img_path, str):
+            img0 = cv2.imread(img_path)
+        else:
+            img0 = img_path
+        self.img = img = copy.deepcopy(img0)
+        
+        for box in self.result_dict['boxes']:
+            if box.label.split('_')[0] == 'SPVB':
+                img = draw_result(img, [box], color=(255, 0, 0), put_label=False, put_percent=False)
+            else:
+                img = draw_result(img, [box], color=(0, 0, 255), put_label=False, put_percent=False)
+        cv2.imwrite('data/tmp/test.png', img)
+        
+        self.sos_dict = self.calculate_sos()
+        return self.sos_dict, img
+    
+    def calculate_sos(self):
+        boxes = self.result_dict['boxes']
+        floor_total_width = params['width_one_floor'] * params['num_floors']
+        num_bottles_per_class = {}
+        for cl in self.classes:
+            num_bottles_per_class[cl] = 0
+        for box in boxes:
+            num_bottles_per_class[box.label] += 1
+            
+        ret_dict = {'total_num_boxes': {}, 'percent': {}}
+        for param in ret_dict:
+            for group in groups:
+                ret_dict[param][group] = {}
+                for drink_type in drink_types:
+                    ret_dict[param][group][drink_type] = 0.0 if param == 'percent' else 0
+                
+        for box in boxes:
+            key_split = box.label.split('_')
+            group = key_split[0] if len(key_split) < 3 else key_split[0] + '_' + key_split[1]
+            drink_type = key_split[-1]
+            ret_dict['percent'][group][drink_type] += box.w / floor_total_width * 100
+            ret_dict['total_num_boxes'][group][drink_type] += 1
+            ret_dict['percent'][group][drink_type] = round(ret_dict['percent'][group][drink_type], 1)
+            
+        ret_dict['percent_skus'] = {}
+        skus_spvb = ret_dict['total_num_boxes']['SPVB']
+        skus_nonspvb = ret_dict['total_num_boxes']['NON_SPVB']
+        num_skus_spvb = sum([skus_spvb[sku] for sku in skus_spvb])
+        num_skus_nonspvb = sum([skus_nonspvb[sku] for sku in skus_nonspvb])
+        ret_dict['percent_skus']['SPVB'] = round(num_skus_spvb / (num_skus_nonspvb + num_skus_spvb) * 100)
+        ret_dict['percent_skus']['NON_SPVB'] = round(num_skus_nonspvb / (num_skus_nonspvb + num_skus_spvb) * 100)
+        return ret_dict
 
 class Yolov8Model():
     def __init__(self):
@@ -130,5 +179,8 @@ class Yolov8Model():
         return sos_dict
         
 if __name__ == '__main__':
-    model = Yolov8Model()
-    model.analyze_one_image("data/output/IMG_5841.png")
+    # model = Yolov8Model()
+    # model.analyze_one_image("data/output/IMG_5841.png")
+    model = TestModel()
+    a, img = model.analyze_one_image('data/samples/images/IMG_0419_08_5_20.png')    
+    

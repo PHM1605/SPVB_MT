@@ -2,6 +2,33 @@ import os, cv2, copy, imutils
 import numpy as np
 from scipy import stats
 from PIL import ImageFont, ImageDraw, Image
+import xml.etree.ElementTree as ET
+
+class BoundingBox:
+    def __init__(self, res, mode):
+        if mode=='xyxy':
+            self.x1 = res['x1']
+            self.y1 = res['y1']
+            self.x2 = res['x2']
+            self.y2 = res['y2']
+            self.cen_x = int((self.x1 + self.x2)/2)
+            self.cen_y = int((self.y1 + self.y2)/2)
+            self.w = int(self.x2 - self.x1)
+            self.h = int(self.y2 - self.y1)
+            
+        elif mode=='xywh':
+            self.cen_x = res['x']
+            self.cen_y = res['y']
+            self.w = res['width']
+            self.h = res['height']
+            self.x1 = int(res['x'] - res['width']/2)
+            self.y1 = int(res['y'] - res['height']/2)
+            self.x2 = int(res['x'] + res['width']/2)
+            self.y2 = int(res['y'] + res['height']/2)
+
+        self.prob = res['confidence']
+        self.label = res['class']
+        self.area = self.w * self.h
 
 def calculate_overlap(box1, box2):
     a, b = box1, box2
@@ -270,3 +297,38 @@ def perspective_transform_and_resize(img, resize):
 
 def sort_imgs_str(img_names):
     return sorted(img_names, key=lambda x: int(x.split('.')[0].rsplit('frame')[-1]))
+
+def convert_xml_to_boxes(xml_file):
+    tree = ET.parse(xml_file)
+    objects = tree.findall('object')
+    list_boxes = []
+    for obj in objects:
+        bbox = obj.find('bndbox')
+        x1 = int(bbox.find('xmin').text)
+        y1 = int(bbox.find('ymin').text)
+        x2 = int(bbox.find('xmax').text)
+        y2 = int(bbox.find('ymax').text)
+        label = obj.find('name').text
+        box = {'x1': x1, 'x2': x2, 'y1': y1, 'y2': y2, 'class': label, 'confidence': 1.0}
+        box = BoundingBox(box, mode='xyxy')
+        list_boxes.append(box)
+    return list_boxes
+
+# group: SPVB/NON_SPVB; drink_type: CSD/ED/JD/TEA/WATER
+def count_group_and_type(count_dict):
+    groups, drink_types = [], []
+    for key in count_dict.keys():
+        key_split = key.split('_')
+        group = key_split[0] if len(key_split) < 3 else key_split[0] + '_' + key_split[1]
+        drink_type = key_split[-1]
+        groups.append(group)
+        drink_types.append(drink_type)
+    groups = np.unique(groups)
+    drink_types = np.unique(drink_types)
+    
+    ret_dict = {}
+    for group in groups:
+        ret_dict[group] = {}
+        for drink_type in drink_types:
+            ret_dict[group][drink_type] = count_dict[group+'_'+drink_type]
+    return ret_dict

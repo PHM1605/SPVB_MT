@@ -4,7 +4,11 @@ from utils import crop_black, crop_edge, get_four_corners, filter_matches, get_s
 from utils import perspective_transform, perspective_transform_and_resize, sort_imgs_str
 
 class StitchingClip():
-    def __init__(self, clip_path, rewind=6, slope_thr=0.8, stride=40):
+    def __init__(self, clip_path, rewind=6, slope_thr=0.8, stride=40, return_img_flag = False):
+        """
+        Args:
+            return_img_flag: if True -> return out_image array when run(); else write to disk
+        """
         self.clip_path = clip_path
         self.frames_path = "data/images"
         self.output_path = "data/output"
@@ -15,7 +19,12 @@ class StitchingClip():
         self.rewind = rewind
         self.slope_thr = slope_thr
         self.stride = stride
-        self.output_name = f'{self.folder_name}_0{int(self.slope_thr*10)}_{str(self.rewind)}_{str(self.stride)}.png'
+        self.return_img_flag = return_img_flag
+        self.ret_dict = {'clip_name': self.folder_name, 
+                         'clip_full_name': self.clip_name,
+                         'out_img_name': None,
+                         'quality_in': None,
+                         'quality_out': None}
         
     def extract_frames(self, rotate=None):
         if not os.path.exists(self.frames_path):
@@ -35,9 +44,10 @@ class StitchingClip():
         vid_cap = cv2.VideoCapture(self.clip_path)
         sift = cv2.SIFT_create()
         success, last = vid_cap.read()
+        #last = cv2.resize(last, (750, 1400))
         if rotate is not None:
             last = cv2.rotate(last, rotate)
-        cv2.imwrite('data/images/frame0.png', last)
+        #cv2.imwrite('data/images/frame0.png', last)
         #print("Captured frame0.png")
         count = 1
         frame_num = 1
@@ -80,20 +90,24 @@ class StitchingClip():
 
                     if min_match_num < np.count_nonzero(mask) < max_match_num:
                         last = image
-                        #print("Captured frame{}.png".format(frame_num))
+                        # print("Captured frame{}.png".format(frame_num))
                         cv2.imwrite('data/images/frame%d.png' % frame_num, last)
                         frame_num += 1
 
             success, image = vid_cap.read()
-            if rotate is not None:
-                image = cv2.rotate(image, rotate)
+            if success:
+                # image = cv2.resize(image, (750, 1400))
+                if rotate is not None:
+                    image = cv2.rotate(image, rotate)
             count += 1
 
     def run(self):
         img_list = glob.glob('data/images/*.png')
         img_list = sort_imgs_str(img_list)
-        
         prev = cv2.imread(img_list[0])
+        
+        self.ret_dict['quality_in'] = [prev.shape[1], prev.shape[0]]
+        self.output_name = f'{self.folder_name}_0{int(self.slope_thr*10)}_{str(self.rewind)}_{str(self.stride)}_{self.ret_dict["quality_in"][0]}x{self.ret_dict["quality_in"][1]}.png'
         crop_list = []
         for i in range(1, len(img_list)):
             curr = cv2.imread(img_list[i])
@@ -101,7 +115,7 @@ class StitchingClip():
             crop_img = crop_edge(stitched_img)
             # print(f'Stitch frame{i} and frame{i-1} successfully')
             crop_img = imutils.resize(crop_img, height=curr.shape[0])
-            cv2.imwrite(f'frame_{i}.png', crop_img)
+            cv2.imwrite(f'data/tmp/frame_{i}.png', crop_img)
             # print(get_slope(crop_img))
             if i == (len(img_list) - 1):
                 crop_img = perspective_transform_and_resize(crop_img, resize=True)
@@ -125,10 +139,16 @@ class StitchingClip():
         except:
             pass
         final_img = crop_black(final_img)
-        cv2.imwrite(os.path.join(self.output_path, self.output_name), final_img)
         msg = f'Stitching completed for {self.output_name}'
+        self.ret_dict['message'] = msg
         print(msg)
-        return final_img, msg
+        self.ret_dict['quality_out'] = [final_img.shape[1], final_img.shape[0]]
+        
+        if self.return_img_flag:
+            self.ret_dict['out_image'] = final_img
+        else:
+            cv2.imwrite(os.path.join(self.output_path, self.output_name), final_img)
+        return self.ret_dict
     
     def stitch(self, prev, curr, draw_matches=False):
         sift = cv2.SIFT_create()
@@ -251,13 +271,13 @@ if __name__ == '__main__':
     #     stitch_clip.extract_frames(rotate=None)
     #     stitch_clip.run()
     
-    for slope in [0.8, 0.7, 0.6, 0.5]:
-        for rewind in [6, 5, 4]:
-            for stride in [40, 30, 20]:
+    for slope in [0.8]:
+        for rewind in [5]:
+            for stride in [40]:
                 try:
-                    time_start = time.time()
                     stitch_clip = StitchingClip(clip_path = 'data/vids/IMG_5820.MOV', slope_thr=slope, rewind=rewind, stride=stride)
-                    stitch_clip.extract_frames(rotate=None)
+                    #stitch_clip.extract_frames(rotate=None)
+                    time_start = time.time()
                     stitch_clip.run()
                     time_stop = time.time()
                     elapse = time_stop-time_start
