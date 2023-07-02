@@ -89,6 +89,7 @@ class View():
         width_cell = 15
         e = Entry(self.table, width=width_cell, fg='black', font=('Arial',16,'bold') )
         e.grid(row=0, column=0)
+        e.insert(END, '%')
         for i, row in enumerate(labels):
             e = Entry(self.table, width=width_cell, fg='black', font=('Arial',16,'bold') )
             e.grid(row=i+1, column=0)
