@@ -22,7 +22,8 @@ class View():
     def create_menu(self):
         self.menu_bar = Menu(self.root)
         self.file_menu = Menu(self.menu_bar, tearoff=0)
-        self.file_menu.add_command(label="Choose clip...", command=self.controller.on_menu_open)
+        self.file_menu.add_command(label="Choose image...", command=self.controller.on_menu_open_image)
+        self.file_menu.add_command(label="Choose clip...", command=self.controller.on_menu_open_clip)
         self.file_menu.add_separator()
         self.file_menu.add_command(label="Exit", command=self.root.destroy)
         self.menu_bar.add_cascade(label="File", menu=self.file_menu)
@@ -74,6 +75,7 @@ class View():
         drink_types = list(sos_dict['percent']['SPVB'].keys())
         colors = ['blue', 'red']
         sizes = [sos_dict['percent_skus']['SPVB'], sos_dict['percent_skus']['NON_SPVB']]
+        plt.clf()
         plt.pie(sizes, labels = labels, colors = colors, startangle=90, shadow = True, explode = (0.1, 0.1), autopct = '%1.0f%%')
         #plt.title('Beverage distribution')
         plt.axis('equal')

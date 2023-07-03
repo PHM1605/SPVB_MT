@@ -1,7 +1,7 @@
 import cv2, glob, imutils, os, shutil, time
 import numpy as np
-from utils import crop_black, crop_edge, get_four_corners, filter_matches, get_slope
-from utils import perspective_transform, perspective_transform_and_resize, sort_imgs_str
+from m_utils import crop_black, crop_edge, get_four_corners, filter_matches, get_slope
+from m_utils import perspective_transform, perspective_transform_and_resize, sort_imgs_str
 
 class StitchingClip():
     def __init__(self, clip_path, rewind=6, slope_thr=0.8, stride=40, return_img_flag = False):
@@ -145,6 +145,7 @@ class StitchingClip():
         self.ret_dict['quality_out'] = [final_img.shape[1], final_img.shape[0]]
         
         if self.return_img_flag:
+            cv2.imwrite(os.path.join(self.output_path, self.output_name), final_img)
             self.ret_dict['out_image'] = final_img
         else:
             cv2.imwrite(os.path.join(self.output_path, self.output_name), final_img)
@@ -273,9 +274,9 @@ if __name__ == '__main__':
     
     for slope in [0.8]:
         for rewind in [5]:
-            for stride in [40]:
+            for stride in [20]:
                 try:
-                    stitch_clip = StitchingClip(clip_path = 'data/vids/IMG_5820.MOV', slope_thr=slope, rewind=rewind, stride=stride)
+                    stitch_clip = StitchingClip(clip_path = 'data/vids/IMG_0419.MOV', slope_thr=slope, rewind=rewind, stride=stride)
                     #stitch_clip.extract_frames(rotate=None)
                     time_start = time.time()
                     stitch_clip.run()
