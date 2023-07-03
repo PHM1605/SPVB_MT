@@ -47,7 +47,7 @@ class StitchingClip():
         #last = cv2.resize(last, (750, 1400))
         if rotate is not None:
             last = cv2.rotate(last, rotate)
-        #cv2.imwrite('data/images/frame0.png', last)
+        cv2.imwrite('data/images/frame0.png', last)
         #print("Captured frame0.png")
         count = 1
         frame_num = 1
@@ -87,8 +87,9 @@ class StitchingClip():
 
                     # Compute the Homography matrix
                     _, mask = cv2.findHomography(img1_pts, img2_pts, cv2.RANSAC, 5.0)
-
+                    
                     if min_match_num < np.count_nonzero(mask) < max_match_num:
+                    #if min_match_num < np.count_nonzero(mask):
                         last = image
                         # print("Captured frame{}.png".format(frame_num))
                         cv2.imwrite('data/images/frame%d.png' % frame_num, last)
@@ -131,14 +132,12 @@ class StitchingClip():
                 prev = crop_img
 
         final_img = crop_list[0]
-        for i in range(len(crop_list)):
-            final_img = self.stitch_short(final_img, crop_list[i])
-        final_img = crop_edge(final_img)
-        try:
+        if len(crop_list) >= 2:
+            for i in range(len(crop_list)):
+                final_img = self.stitch_short(final_img, crop_list[i])
+            final_img = crop_edge(final_img)
             final_img = perspective_transform_and_resize(final_img, resize = False)
-        except:
-            pass
-        final_img = crop_black(final_img)
+            final_img = crop_black(final_img)
         msg = f'Stitching completed for {self.output_name}'
         self.ret_dict['message'] = msg
         print(msg)
@@ -265,13 +264,19 @@ class StitchingClip():
         return crop_img
     
 if __name__ == '__main__':
-    # vid_list = glob.glob('data/vids/*.MOV')
-    # for vid in vid_list:
-    #     stitch_clip = StitchingClip(clip_path = vid)
-    #     #stitch_clip.extract_frames(rotate= cv2.ROTATE_90_CLOCKWISE)
-    #     stitch_clip.extract_frames(rotate=None)
-    #     stitch_clip.run()
+    vid_list = glob.glob('data/vids/*.MOV')
+    for vid in vid_list:
+        if vid == 'data/vids\IMG_0546.MOV':
+            continue
+        stitch_clip = StitchingClip(clip_path = vid, slope_thr=0.8, rewind=2, stride=40)
+        stitch_clip.extract_frames(rotate= cv2.ROTATE_180)
+        time_start = time.time()
+        stitch_clip.run()
+        time_stop = time.time()
+        elapse = time_stop-time_start
+        print(f"Elapsed time is {elapse}")
     
+    """
     for slope in [0.8]:
         for rewind in [5]:
             for stride in [20]:
@@ -285,3 +290,4 @@ if __name__ == '__main__':
                     print(f"Elapsed time is {elapse}")
                 except:
                     print(f'Stitching for {stitch_clip.output_name} failed')
+    """
