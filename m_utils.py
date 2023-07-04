@@ -1,5 +1,6 @@
 import os, cv2, copy, imutils
 import numpy as np
+from datetime import datetime
 from scipy import stats
 from PIL import ImageFont, ImageDraw, Image
 import xml.etree.ElementTree as ET
@@ -73,7 +74,7 @@ def put_text(img, text, loc):
 def draw_result(img, boxes, color, put_label, put_percent):
     ret = copy.deepcopy(img)
     for i, box in enumerate(boxes):
-        thickness = 2
+        thickness = int(img.shape[0]/250)
         font = cv2.FONT_HERSHEY_SIMPLEX
         ret = cv2.rectangle(ret, (box.x1, box.y1), (box.x2, box.y2), color, thickness)
         if put_label:
@@ -342,3 +343,14 @@ def count_group_and_type(count_dict):
             ret_dict[group][drink_type] = count_dict[group+'_'+drink_type]
     return ret_dict
 
+def update_datetime_to_img(img, return_date_str=False):
+    now = datetime.now()
+    date_time = now.strftime("%d/%m/%Y, %H:%M:%S")
+    orig = (int(img.shape[1]/2), img.shape[0]-20)
+    font_scale = int(img.shape[0]/600)
+    thickness = int(img.shape[0]/300)
+    img = cv2.putText(img, date_time, orig, cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0,255,255), thickness, cv2.LINE_AA)
+    if return_date_str:
+        return img, date_time
+    else:
+        return img

@@ -4,7 +4,7 @@ from m_utils import crop_black, crop_edge, get_four_corners, filter_matches, get
 from m_utils import perspective_transform, perspective_transform_and_resize, sort_imgs_str
 
 class StitchingClip():
-    def __init__(self, clip_path, rewind=6, slope_thr=0.8, stride=40, return_img_flag = False):
+    def __init__(self, clip_path, rewind=6, slope_thr=0.8, stride=40, return_img_flag = False, progress_interface=None):
         """
         Args:
             return_img_flag: if True -> return out_image array when run(); else write to disk
@@ -20,6 +20,7 @@ class StitchingClip():
         self.slope_thr = slope_thr
         self.stride = stride
         self.return_img_flag = return_img_flag
+        self.prog_interface = progress_interface # for interacting with GUI
         self.ret_dict = {'clip_name': self.folder_name, 
                          'clip_full_name': self.clip_name,
                          'out_img_name': None,
@@ -101,6 +102,8 @@ class StitchingClip():
                 if rotate is not None:
                     image = cv2.rotate(image, rotate)
             count += 1
+        if self.prog_interface is not None:
+            self.prog_interface.update_progress_bar(20)
 
     def run(self):
         img_list = glob.glob('data/images/*.png')
@@ -130,6 +133,8 @@ class StitchingClip():
                 prev = self.stitch_list(img_list[i-self.rewind : (i + 1)], resize = True)
             else:
                 prev = crop_img
+            if self.prog_interface is not None:
+                self.prog_interface.update_progress_bar(20 + i/len(img_list)*70)
 
         final_img = crop_list[0]
         if len(crop_list) >= 2:

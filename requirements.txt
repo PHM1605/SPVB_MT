@@ -1,0 +1,11 @@
+imutils
+matplotlib
+scipy
+seaborn
+torch
+torchvision
+tqdm
+opencv-python
+pandas
+Pillow
+pyyaml

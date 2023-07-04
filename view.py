@@ -1,7 +1,7 @@
 import cv2, copy
 import matplotlib.pyplot as plt
 import tkinter as tk
-from tkinter import Button, Canvas, END, Entry, Label, LabelFrame, Menu
+from tkinter import Button, Canvas, END, Entry, Label, LabelFrame, Menu, ttk
 from PIL import Image, ImageTk
 
 
@@ -17,7 +17,9 @@ class View():
         self.create_menu()
         self.create_drawing_canvas()
         self.create_pie_chart()
+        self.create_progress_bar()
         self.create_table()
+        
 
     def create_menu(self):
         self.menu_bar = Menu(self.root)
@@ -45,11 +47,16 @@ class View():
 
     def create_pie_chart(self):
         self.pie_chart = Canvas(self.root, width = self.pie_chart_shape[0], height = self.pie_chart_shape[1])
-        self.pie_chart.grid(row=1, column=0)
+        self.pie_chart.grid(row=1, column=0, rowspan=2)
+    
+    def create_progress_bar(self):
+        self.pb = ttk.Progressbar(self.root, orient='horizontal', mode='determinate', length=self.table_shape[0])
+        self.pb.grid(row=1, column=1)
+        self.pb.grid_configure(padx=20)
     
     def create_table(self):
-        self.table = LabelFrame(self.root, width = self.table_shape[0], height=self.table_shape[1])
-        self.table.grid(row=1, column=1)
+        self.table = LabelFrame(self.root, width = self.table_shape[0], height=self.table_shape[1], borderwidth=0, highlightthickness=0)
+        self.table.grid(row=2, column=1)
     
     # resize and convert from cv2 image to image suitable for tk
     def convert_image_to_display(self, img, size=None):
@@ -67,6 +74,12 @@ class View():
         tk_img = self.convert_image_to_display(img)
         self.img_canvas.create_image(0, 0, anchor = 'nw', image = tk_img)
         self.img_canvas.update()
+    
+    def update_progress_bar(self, val):
+        global pb_value
+        pb_value = val
+        self.pb['value'] = pb_value
+        self.root.update()
     
     def update_result(self, sos_dict):
         """ Update pie chart """
