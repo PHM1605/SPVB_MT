@@ -29,7 +29,8 @@ class Controller():
     def on_menu_open_clip(self): # evt is the event object
         self.path = filedialog.askopenfilename()
         if len(self.path) > 0:
-            self.stitch_app = StitchingClip(self.path, return_img_flag=True, progress_interface=self.view)
+            self.stitch_app = StitchingClip(self.path, rewind=2, slope_thr=0.8, stride=40, \
+                                            return_img_flag=True, progress_interface=self.view)
             #self.stitch_app.extract_frames(rotate=cv2.ROTATE_90_CLOCKWISE)
             self.stitch_app.extract_frames(rotate=None)
             result_dict = self.stitch_app.run()

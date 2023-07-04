@@ -1,13 +1,15 @@
 import cv2, copy
 import matplotlib.pyplot as plt
 import tkinter as tk
-from tkinter import Button, Canvas, END, Entry, Label, LabelFrame, Menu, ttk
+from tkinter import Button, Canvas, END, Entry, Label, LabelFrame, Menu, PhotoImage, ttk
 from PIL import Image, ImageTk
 
 
 class View():
     def __init__(self, controller, root):
         self.root = root
+        self.root.iconphoto(False, PhotoImage(file='data/dms_logo.png'))
+        self.root.title("DMSPro demo software")
         self.controller = controller
         self.curr_img = None
         self.img_shape = (1400, 400)

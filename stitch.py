@@ -21,6 +21,7 @@ class StitchingClip():
         self.stride = stride
         self.return_img_flag = return_img_flag
         self.prog_interface = progress_interface # for interacting with GUI
+        self.prog_bar_val = 0
         self.ret_dict = {'clip_name': self.folder_name, 
                          'clip_full_name': self.clip_name,
                          'out_img_name': None,
@@ -95,6 +96,9 @@ class StitchingClip():
                         # print("Captured frame{}.png".format(frame_num))
                         cv2.imwrite('data/images/frame%d.png' % frame_num, last)
                         frame_num += 1
+                    if self.prog_interface is not None and self.prog_bar_val < 20:
+                        self.prog_bar_val += 1 
+                        self.prog_interface.update_progress_bar(self.prog_bar_val)
 
             success, image = vid_cap.read()
             if success:
@@ -102,8 +106,10 @@ class StitchingClip():
                 if rotate is not None:
                     image = cv2.rotate(image, rotate)
             count += 1
+            
         if self.prog_interface is not None:
-            self.prog_interface.update_progress_bar(20)
+            self.prog_bar_val = 20
+            self.prog_interface.update_progress_bar(self.prog_bar_val)
 
     def run(self):
         img_list = glob.glob('data/images/*.png')
@@ -134,7 +140,7 @@ class StitchingClip():
             else:
                 prev = crop_img
             if self.prog_interface is not None:
-                self.prog_interface.update_progress_bar(20 + i/len(img_list)*70)
+                self.prog_interface.update_progress_bar(self.prog_bar_val + i/len(img_list)*70)
 
         final_img = crop_list[0]
         if len(crop_list) >= 2:
