@@ -72,7 +72,7 @@ class TestModel():
         return ret_dict
 
 class Yolov7Model():
-    def __init__(self, weights='./bestmt.pt', img_size=640, conf_thres=0.25, iou_thres=0.45, device='cpu', project='runs/detect'):
+    def __init__(self, weights='./bestmt0705.pt', img_size=640, conf_thres=0.25, iou_thres=0.45, device='cpu', project='runs/detect'):
         self.device = select_device('cpu')
         self.model = attempt_load(weights, map_location=device)
         self.stride = int(self.model.stride.max())

@@ -343,9 +343,11 @@ def count_group_and_type(count_dict):
             ret_dict[group][drink_type] = count_dict[group+'_'+drink_type]
     return ret_dict
 
-def update_datetime_to_img(img, return_date_str=False):
+def update_datetime_to_img(img, return_date_str=False, msg=None):
     now = datetime.now()
     date_time = now.strftime("%d/%m/%Y, %H:%M:%S")
+    if msg is not None:
+        date_time = date_time + msg
     orig = (int(img.shape[1]/2), img.shape[0]-20)
     font_scale = int(img.shape[0]/600)
     thickness = int(img.shape[0]/300)
