@@ -277,11 +277,11 @@ class StitchingClip():
 if __name__ == '__main__':
     vid_list = glob.glob('data/vids/*.MOV')
     for vid in vid_list:
-        if vid != 'data/vids\IMG_5908.MOV':
+        if vid != 'data/vids\IMG_5820.MOV':
             continue
         stitch_clip = StitchingClip(clip_path = vid, slope_thr=0.8, rewind=2, stride=30)
         #stitch_clip.extract_frames(rotate= cv2.ROTATE_180)
-        stitch_clip.extract_frames(rotate= None)
+        #stitch_clip.extract_frames(rotate= None)
         time_start = time.time()
         stitch_clip.run()
         time_stop = time.time()
@@ -305,18 +305,3 @@ if __name__ == '__main__':
     """
     
     
-    
-# 10uH 4x6mm 20 cái 740
-# 100uH 4x6mm 20 cái 860
-# 220uH 4x6mm 20 cái 740
-# 10uH 8x10mm 10 cái
-# 1uH 6x8mm 10 cái
-# 4.7uH 6x8mm 10 cái
-# 15uH 6x8mm 10 cái
-# 1mH 8x10mm 10 cái 1400
-# 33uH 6x8mm 10 cái
-# 150uH 6x8mm 10 cái
-# 1000uH 6x8mm 10 cái
-# 10mH 10x16mm 5 cái
-
-# 20*740+

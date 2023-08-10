@@ -247,7 +247,7 @@ def get_four_corners(img, mode, num_pixels=500, threshold=30):
             slope, intercept, _, _, _ = stats.linregress(lb_pnts[:, 0], lb_pnts[:,1])
             y = img.shape[0] - 1
             x = int(np.floor((y-intercept)/slope))
-            left_bottom = np.array([x, y])
+            left_bottom = [x, y]
             return [top_left, top_right, bottom_right, left_bottom]
         
         elif mode == 'bottom_left':
@@ -255,7 +255,7 @@ def get_four_corners(img, mode, num_pixels=500, threshold=30):
             
             return [top_left, top_right, bottom_right, bottom_left]
     except:
-        return [top_left, top_right, bottom_right, np.array(0, img.shape[0]-1)]
+        return [top_left, top_right, bottom_right, [0, img.shape[0]-1]]
 
 def get_slope(img, num_pixels=500, threshold=30):
     lb_pnts = get_left_bottom_points(img, num_pixels, threshold)
